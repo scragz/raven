@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 # Fallback attribute name lists in priority order
 _SR_ATTRS = ["sr", "sample_rate"]
 _BLOCK_ATTRS = ["block_size", "hop_length"]
-_LATENT_ATTRS = ["latent_size", "n_latents", "z_dim", "latent_dim"]
+_LATENT_ATTRS = ["cropped_latent_size", "latent_size", "n_latents", "z_dim", "latent_dim"]
 
 
 class RAVEModel:
