@@ -1,4 +1,4 @@
-# RAVE Latent Trajectory Generator — Spec
+# RAVE Latent Trajectory Generator 🐦‍⬛
 
 ## Purpose
 
