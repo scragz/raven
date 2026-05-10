@@ -1,9 +1,9 @@
 model = {
-    "path": "./models/guitar.ts",
+    "path": "./models/sax_soprano_franziskaschroeder_b2048_r48000_z20.ts",
     "attrs": {},
     "sample_rate": 48000,
     "block_size": 2048,
-    "n_latents": 16,
+    "n_latents": 20,
 }
 
 global_config = {
@@ -18,7 +18,7 @@ sweep = {
     "cache": True,
     "range": [-3.0, 3.0],
     "steps": 100,
-    "threshold": 0.05,
+    "threshold": 1e-6,
 }
 
 algorithms = {
