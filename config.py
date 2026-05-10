@@ -1,34 +1,35 @@
 model_sax_soprano_franziskaschroeder_b2048_r48000_z20 = {
     "path": "./models/sax_soprano_franziskaschroeder_b2048_r48000_z20.ts",
-    "attrs": {},
-    "sample_rate": 48000,
-    "block_size": 2048,
     "n_latents": 20,
 }
 
 model_voice_vocalset_b2048_r48000_z16 = {
     "path": "./models/voice_vocalset_b2048_r48000_z16.ts",
-    "attrs": {},
-    "sample_rate": 48000,
-    "block_size": 2048,
     "n_latents": 16,
 }
 
 model_organ_archive_b2048_r48000_z16 = {
     "path": "./models/organ_archive_b2048_r48000_z16.ts",
-    "attrs": {},
-    "sample_rate": 48000,
-    "block_size": 2048,
     "n_latents": 16,
 }
 
-model = model_organ_archive_b2048_r48000_z16
+
+model_guitar_iil_b2048_r48000_z16 = {
+    "path": "./models/guitar_iil_b2048_r48000_z16.ts",
+    "n_latents": 16,
+}
+
+model = model_organ_archive_b2048_r48000_z16 | {
+    "attrs": {},
+    "sample_rate": 48000,
+    "block_size": 2048,
+}
 
 global_config = {
     "output_dir": "./output/",
-    "duration": 30.0,
-    "seed": 12345,
-    "normalize": False,
+    "duration": 120.0,
+    "seed": 98653861,
+    "normalize": True,
 }
 
 sweep = {
