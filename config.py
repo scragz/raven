@@ -112,6 +112,139 @@ algorithms = {
         "scale": 0.1,
         "dt": 0.01,
     },
+    "duffing_snap_x": {
+        "type": "duffing",
+        "component": "x",
+        "delta": 0.18,
+        "alpha": -1.0,
+        "beta": 1.0,
+        "gamma": 0.46,
+        "omega": 1.15,
+        "dt": 0.07,
+        "scale": 1.6,
+    },
+    "duffing_snap_v": {
+        "type": "duffing",
+        "component": "v",
+        "delta": 0.18,
+        "alpha": -1.0,
+        "beta": 1.0,
+        "gamma": 0.46,
+        "omega": 1.15,
+        "dt": 0.07,
+        "scale": 1.1,
+    },
+    "duffing_grind_x": {
+        "type": "duffing",
+        "component": "x",
+        "delta": 0.08,
+        "alpha": -1.0,
+        "beta": 1.0,
+        "gamma": 0.62,
+        "omega": 1.38,
+        "dt": 0.09,
+        "scale": 1.8,
+    },
+    "henon_x": {
+        "type": "henon",
+        "component": "x",
+        "a": 1.4,
+        "b": 0.3,
+        "scale": 1.25,
+    },
+    "henon_y": {
+        "type": "henon",
+        "component": "y",
+        "a": 1.4,
+        "b": 0.3,
+        "scale": 2.8,
+    },
+    "ikeda_x": {
+        "type": "ikeda",
+        "component": "x",
+        "u": 0.93,
+        "scale": 0.9,
+    },
+    "ikeda_y": {
+        "type": "ikeda",
+        "component": "y",
+        "u": 0.93,
+        "scale": 0.9,
+    },
+    "lattice_energy": {
+        "type": "logistic_lattice",
+        "n_cells": 192,
+        "r": 3.94,
+        "coupling": 0.22,
+        "substeps": 12,
+        "statistic": "energy",
+        "scale": 8.0,
+    },
+    "lattice_gradient": {
+        "type": "logistic_lattice",
+        "n_cells": 192,
+        "r": 3.97,
+        "coupling": 0.16,
+        "substeps": 16,
+        "statistic": "gradient",
+        "scale": 9.0,
+    },
+    "lattice_cell": {
+        "type": "logistic_lattice",
+        "n_cells": 192,
+        "r": 3.91,
+        "coupling": 0.08,
+        "substeps": 10,
+        "statistic": "cell",
+        "cell": 37,
+        "scale": 5.5,
+    },
+    "reaction_spot": {
+        "type": "reaction_diffusion",
+        "n_cells": 256,
+        "substeps": 18,
+        "feed": 0.0367,
+        "kill": 0.0649,
+        "statistic": "spot",
+        "cell": 97,
+        "scale": 11.0,
+    },
+    "reaction_edge": {
+        "type": "reaction_diffusion",
+        "n_cells": 256,
+        "substeps": 18,
+        "feed": 0.029,
+        "kill": 0.057,
+        "statistic": "edge",
+        "scale": 13.0,
+    },
+    "reaction_centroid": {
+        "type": "reaction_diffusion",
+        "n_cells": 256,
+        "substeps": 20,
+        "feed": 0.025,
+        "kill": 0.055,
+        "statistic": "centroid",
+        "scale": 0.09,
+    },
+    "osc_cloud": {
+        "type": "oscillator_bank",
+        "n_oscillators": 96,
+        "min_freq_hz": 0.01,
+        "max_freq_hz": 3.5,
+        "fm_depth": 0.7,
+        "feedback": 0.12,
+        "scale": 2.2,
+    },
+    "osc_swarm": {
+        "type": "oscillator_bank",
+        "n_oscillators": 192,
+        "min_freq_hz": 0.02,
+        "max_freq_hz": 6.0,
+        "fm_depth": 1.25,
+        "feedback": 0.22,
+        "scale": 2.6,
+    },
     "brown_narrow": {
         "type": "brownian",
         "sigma": 0.05,
@@ -224,6 +357,7 @@ algorithms = {
     },
 }
 
+
 def _route(pattern):
     return {f"active_{i}": pattern[i % len(pattern)] for i in range(model["n_latents"])}
 
@@ -302,7 +436,7 @@ collections = {
         ),
     },
     "pulse": {
-        "description": "hard gates mixed with moving carriers so pulsing does not decode as silence",
+        "description": "hard gates mixed with carriers so pulsing does not decode as silence",
         "unassigned": "zero",
         "routing": _route(
             [
@@ -373,6 +507,62 @@ collections = {
             ]
         ),
     },
+    "strange_maps": {
+        "description": "discrete attractor maps and Duffing axes with abrupt mirrored folds",
+        "unassigned": "zero",
+        "routing": _route(
+            [
+                ("henon_x", 1.0),
+                ("henon_y", -1.0),
+                ("ikeda_x", 1.0),
+                ("ikeda_y", -1.0),
+                ("duffing_snap_x", 1.0),
+                ("duffing_snap_v", -1.0),
+                ("duffing_grind_x", 1.0),
+                ("lorenz_hot_z", -1.0),
+            ]
+        ),
+    },
+    "reaction_lattice": {
+        "description": "expensive spatial simulations projected into competing latent axes",
+        "unassigned": "noise",
+        "routing": _route(
+            [
+                ("reaction_spot", 1.0),
+                ("reaction_edge", -1.0),
+                ("reaction_centroid", 1.0),
+                ("lattice_energy", -1.0),
+                ("lattice_gradient", 1.0),
+                ("lattice_cell", -1.0),
+                ("osc_cloud", 0.75),
+                ("osc_swarm", -0.75),
+            ]
+        ),
+    },
+    "wild_pressure": {
+        "description": "high-cost chaotic sources stacked against fast gates and random carriers",
+        "unassigned": "zero",
+        "routing": _route(
+            [
+                ("osc_swarm", 1.0),
+                ("reaction_edge", 1.0),
+                ("lattice_gradient", -1.0),
+                ("duffing_grind_x", -1.0),
+                ("ikeda_x", 1.0),
+                ("henon_x", -1.0),
+                ("pulse_strobe", 0.75),
+                ("random_hot", -0.85),
+                ("osc_cloud", -1.0),
+                ("reaction_spot", -1.0),
+                ("lattice_energy", 1.0),
+                ("duffing_snap_v", 1.0),
+                ("ikeda_y", -1.0),
+                ("henon_y", 1.0),
+                ("sine_fast", -0.9),
+                ("brown_huge", 0.8),
+            ]
+        ),
+    },
 }
 
 for collection in collections.values():
@@ -388,4 +578,7 @@ batch = [
     "scan",
     "opposition",
     "outside",
+    "strange_maps",
+    "reaction_lattice",
+    "wild_pressure",
 ]
