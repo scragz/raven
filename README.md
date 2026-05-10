@@ -1,4 +1,4 @@
-# RAVE Latent Trajectory Generator 🐦‍⬛
+# Raven 🐦‍⬛: RAVE Latent Trajectory Generator
 
 ## Purpose
 
