@@ -71,7 +71,7 @@ class RAVEModel:
             audio block as float32 array, shape (block_size,)
         """
         z = (
-            torch.from_numpy(latent_vector.astype(np.float32))
+            torch.as_tensor(latent_vector.astype(np.float32))  # type: ignore[reportPrivateImportUsage]
             .unsqueeze(0)  # (1, n_latents)
             .unsqueeze(-1)  # (1, n_latents, 1)
         )
