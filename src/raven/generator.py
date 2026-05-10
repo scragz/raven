@@ -61,6 +61,8 @@ def generate_collection(
         global_seed=global_seed,
         sr_latent=sr_latent,
         sweep_cache=sweep_cache,
+        fit_observed=collection.get("fit_observed", False),
+        fit_margin=collection.get("fit_margin", 0.95),
     )
 
     for w in warnings:

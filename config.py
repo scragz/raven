@@ -1,10 +1,28 @@
-model = {
+model_sax_soprano_franziskaschroeder_b2048_r48000_z20 = {
+    "path": "./models/sax_soprano_franziskaschroeder_b2048_r48000_z20.ts",
+    "attrs": {},
+    "sample_rate": 48000,
+    "block_size": 2048,
+    "n_latents": 20,
+}
+
+model_voice_vocalset_b2048_r48000_z16 = {
     "path": "./models/voice_vocalset_b2048_r48000_z16.ts",
     "attrs": {},
     "sample_rate": 48000,
     "block_size": 2048,
     "n_latents": 16,
 }
+
+model_organ_archive_b2048_r48000_z16 = {
+    "path": "./models/organ_archive_b2048_r48000_z16.ts",
+    "attrs": {},
+    "sample_rate": 48000,
+    "block_size": 2048,
+    "n_latents": 16,
+}
+
+model = model_organ_archive_b2048_r48000_z16
 
 global_config = {
     "output_dir": "./output/",
@@ -39,6 +57,33 @@ algorithms = {
         "beta": 2.667,
         "scale": 0.3,
         "dt": 0.01,
+    },
+    "lorenz_hot_x": {
+        "type": "lorenz",
+        "component": "x",
+        "sigma": 10.0,
+        "rho": 28.0,
+        "beta": 2.667,
+        "scale": 0.11,
+        "dt": 0.018,
+    },
+    "lorenz_hot_y": {
+        "type": "lorenz",
+        "component": "y",
+        "sigma": 10.0,
+        "rho": 28.0,
+        "beta": 2.667,
+        "scale": 0.08,
+        "dt": 0.018,
+    },
+    "lorenz_hot_z": {
+        "type": "lorenz",
+        "component": "z",
+        "sigma": 10.0,
+        "rho": 28.0,
+        "beta": 2.667,
+        "scale": 0.04,
+        "dt": 0.018,
     },
     "lorenz_x": {
         "type": "lorenz",
@@ -77,6 +122,11 @@ algorithms = {
         "sigma": 0.3,
         "clip": [-3.0, 3.0],
     },
+    "brown_huge": {
+        "type": "brownian",
+        "sigma": 0.45,
+        "clip": [-3.0, 3.0],
+    },
     "brown_slow": {
         "type": "brownian",
         "sigma": 0.01,
@@ -88,11 +138,29 @@ algorithms = {
         "amplitude": 1.0,
         "phase": 0.0,
     },
+    "sine_sub": {
+        "type": "sine",
+        "freq_hz": 0.08,
+        "amplitude": 2.6,
+        "phase": 0.0,
+    },
     "sine_med": {
         "type": "sine",
         "freq_hz": 0.3,
         "amplitude": 1.5,
         "phase": 0.0,
+    },
+    "sine_wide": {
+        "type": "sine",
+        "freq_hz": 0.45,
+        "amplitude": 2.6,
+        "phase": 1.5708,
+    },
+    "sine_fast": {
+        "type": "sine",
+        "freq_hz": 1.2,
+        "amplitude": 2.4,
+        "phase": 0.7854,
     },
     "pulse_slow": {
         "type": "pulse",
@@ -106,9 +174,35 @@ algorithms = {
         "duty": 0.2,
         "amplitude": 2.0,
     },
+    "pulse_gate": {
+        "type": "pulse",
+        "rate_hz": 0.35,
+        "duty": 0.5,
+        "amplitude": 2.4,
+    },
+    "pulse_slam": {
+        "type": "pulse",
+        "rate_hz": 0.8,
+        "duty": 0.35,
+        "amplitude": 2.8,
+    },
+    "pulse_strobe": {
+        "type": "pulse",
+        "rate_hz": 2.4,
+        "duty": 0.15,
+        "amplitude": 2.2,
+    },
     "constant_high": {
         "type": "constant",
         "value": 2.5,
+    },
+    "constant_rail": {
+        "type": "constant",
+        "value": 3.5,
+    },
+    "constant_low": {
+        "type": "constant",
+        "value": -2.5,
     },
     "constant_mid": {
         "type": "constant",
@@ -118,90 +212,172 @@ algorithms = {
         "type": "constant",
         "value": 0.0,
     },
+    "random_wide": {
+        "type": "random",
+        "distribution": "uniform",
+        "scale": 2.4,
+    },
+    "random_hot": {
+        "type": "random",
+        "distribution": "uniform",
+        "scale": 2.4,
+    },
 }
+
+def _route(pattern):
+    return {f"active_{i}": pattern[i % len(pattern)] for i in range(model["n_latents"])}
+
 
 collections = {
     "coherent_chaos": {
-        "description": "all active dims from same attractor, correlated drift",
+        "description": "sixteen driven axes from related hot Lorenz components",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("lorenz_slow", 1.0),
-            "active_1": ("lorenz_slow", 1.0),
-            "active_2": ("lorenz_slow", 1.0),
-            "active_3": ("lorenz_slow", 1.0),
-        },
+        "routing": _route(
+            [
+                ("lorenz_hot_x", 1.0),
+                ("lorenz_hot_y", 1.0),
+                ("lorenz_hot_z", 1.0),
+                ("lorenz_hot_x", -1.0),
+                ("lorenz_hot_y", -1.0),
+                ("lorenz_hot_z", -1.0),
+                ("lorenz_slow", 0.85),
+                ("lorenz_slow", -0.85),
+            ]
+        ),
     },
     "multi_attractor": {
-        "description": "different lorenz components per dim, correlated but not identical",
+        "description": "lorenz, sine, brownian, and noise sources stacked across all axes",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("lorenz_x", 1.0),
-            "active_1": ("lorenz_y", 1.0),
-            "active_2": ("lorenz_z", 1.0),
-            "active_3": ("lorenz_x", -1.0),
-        },
+        "routing": _route(
+            [
+                ("lorenz_hot_x", 1.0),
+                ("lorenz_hot_y", -1.0),
+                ("lorenz_hot_z", 1.0),
+                ("sine_sub", 1.0),
+                ("sine_wide", -1.0),
+                ("brown_huge", 1.0),
+                ("brown_huge", -1.0),
+                ("random_wide", 1.0),
+            ]
+        ),
     },
     "tension": {
-        "description": "pinned dims vs wide-swinging dims",
+        "description": "moving push-pull axes with rails moved out of the critical first slots",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("constant_mid", 1.0),
-            "active_1": ("constant_mid", 1.0),
-            "active_2": ("lorenz_wide", 1.0),
-            "active_3": ("lorenz_wide", -1.0),
-        },
+        "routing": _route(
+            [
+                ("lorenz_hot_x", 1.0),
+                ("lorenz_hot_y", -1.0),
+                ("sine_wide", 1.0),
+                ("sine_wide", -1.0),
+                ("brown_huge", 1.0),
+                ("brown_huge", -1.0),
+                ("pulse_gate", 1.0),
+                ("pulse_gate", -1.0),
+                ("lorenz_hot_z", 1.0),
+                ("lorenz_hot_z", -1.0),
+                ("sine_sub", 1.0),
+                ("sine_sub", -1.0),
+                ("brown_wide", 0.8),
+                ("brown_wide", -0.8),
+                ("random_wide", 1.0),
+                ("random_wide", -1.0),
+            ]
+        ),
     },
     "drift": {
-        "description": "pure brownian at different rates, no periodicity",
+        "description": "full-width brownian drift with several clip widths and opposing signs",
         "unassigned": "noise",
-        "routing": {
-            "active_0": ("brown_slow", 1.0),
-            "active_1": ("brown_narrow", 1.0),
-            "active_2": ("brown_wide", 1.0),
-            "active_3": ("brown_slow", -1.0),
-        },
+        "routing": _route(
+            [
+                ("brown_huge", 1.0),
+                ("brown_huge", -1.0),
+                ("brown_wide", 0.3),
+                ("brown_wide", -0.3),
+                ("brown_narrow", 0.95),
+                ("brown_narrow", -0.95),
+                ("brown_slow", 1.4),
+                ("brown_slow", -1.4),
+            ]
+        ),
     },
     "pulse": {
-        "description": "rhythmic switching, hard transitions through latent space",
+        "description": "hard gates mixed with moving carriers so pulsing does not decode as silence",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("pulse_slow", 1.0),
-            "active_1": ("pulse_fast", 1.0),
-            "active_2": ("pulse_slow", -1.0),
-            "active_3": ("constant_zero", 1.0),
-        },
+        "routing": _route(
+            [
+                ("pulse_slam", 1.0),
+                ("sine_fast", -1.0),
+                ("pulse_gate", -1.0),
+                ("brown_huge", 1.0),
+                ("pulse_strobe", 1.0),
+                ("random_wide", -1.0),
+                ("sine_fast", 1.0),
+                ("lorenz_hot_y", -1.0),
+                ("pulse_slam", -1.0),
+                ("sine_sub", 1.0),
+                ("pulse_gate", 1.0),
+                ("brown_huge", -1.0),
+                ("pulse_strobe", -1.0),
+                ("random_wide", 1.0),
+                ("sine_wide", -1.0),
+                ("lorenz_hot_x", 1.0),
+            ]
+        ),
     },
-    "frozen": {
-        "description": "one dim moving, rest pinned — isolates single decoder axis",
+    "scan": {
+        "description": "high-amplitude periodic sweep across all active axes",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("lorenz_slow", 1.0),
-            "active_1": ("constant_zero", 1.0),
-            "active_2": ("constant_zero", 1.0),
-            "active_3": ("constant_zero", 1.0),
-        },
+        "routing": _route(
+            [
+                ("sine_sub", 1.0),
+                ("sine_sub", -1.0),
+                ("sine_wide", 1.0),
+                ("sine_wide", -1.0),
+                ("sine_fast", 1.0),
+                ("sine_fast", -1.0),
+                ("pulse_slow", 0.45),
+                ("pulse_slow", -0.45),
+            ]
+        ),
     },
     "opposition": {
-        "description": "dims moving against each other from same source",
+        "description": "every routed axis has a mirrored partner moving against it",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("lorenz_wide", 1.0),
-            "active_1": ("lorenz_wide", -1.0),
-            "active_2": ("brown_wide", 1.0),
-            "active_3": ("brown_wide", -1.0),
-        },
+        "routing": _route(
+            [
+                ("lorenz_hot_x", 1.0),
+                ("lorenz_hot_x", -1.0),
+                ("lorenz_hot_y", 1.0),
+                ("lorenz_hot_y", -1.0),
+                ("brown_huge", 1.0),
+                ("brown_huge", -1.0),
+                ("pulse_slam", 1.0),
+                ("pulse_slam", -1.0),
+            ]
+        ),
     },
     "outside": {
-        "description": "push dims beyond trained range — decoder hallucinates out-of-distribution",
+        "description": "edge-of-range pressure without leaving the observed latent range",
         "unassigned": "zero",
-        "routing": {
-            "active_0": ("constant_high", 1.0),
-            "active_1": ("constant_high", 1.0),
-            "active_2": ("lorenz_wide", 1.0),
-            "active_3": ("constant_zero", 1.0),
-        },
+        "routing": _route(
+            [
+                ("constant_mid", 0.95),
+                ("constant_mid", -0.95),
+                ("sine_wide", 1.0),
+                ("sine_wide", -1.0),
+                ("lorenz_hot_x", 1.0),
+                ("lorenz_hot_y", -1.0),
+                ("pulse_strobe", 1.0),
+                ("random_hot", 1.0),
+            ]
+        ),
     },
 }
+
+for collection in collections.values():
+    collection["fit_observed"] = "if_needed"
+    collection["fit_margin"] = 0.95
 
 batch = [
     "coherent_chaos",
@@ -209,7 +385,7 @@ batch = [
     "tension",
     "drift",
     "pulse",
-    "frozen",
+    "scan",
     "opposition",
     "outside",
 ]

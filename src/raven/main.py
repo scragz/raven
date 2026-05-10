@@ -86,16 +86,25 @@ def main() -> int:
         return 1
 
     # Check that every collection's routing can be satisfied
+    max_requested_slots = 0
     for name in config["batch"]:
         coll = config["collections"][name]
-        for key in coll["routing"]:
-            idx = int(key.split("_", 1)[1])
-            if idx >= n_active:
-                logger.error(
-                    f"Collection {name!r}: routing key {key!r} requires "
-                    f"at least {idx + 1} active dims, but only {n_active} found."
-                )
-                return 1
+        max_requested_slots = max(max_requested_slots, len(coll["routing"]))
+        n_routed = sum(
+            1
+            for key in coll["routing"]
+            if key.startswith("active_") and int(key.split("_", 1)[1]) < n_active
+        )
+        if n_routed == 0:
+            logger.error(
+                f"Collection {name!r}: no routing entries match the {n_active} active dim(s)."
+            )
+            return 1
+    if n_active < max_requested_slots:
+        logger.warning(
+            f"Presets define up to {max_requested_slots} routing slots; "
+            f"this model exposes {n_active} active dim(s), so extra slots will be ignored."
+        )
 
     # Generate
     results = run_batch(model, config, sweep_cache, seed)

@@ -36,13 +36,29 @@ def resolve_routing(collection_routing: dict, active_dims: list) -> dict:
             raise ValueError(f"Invalid routing key {key!r}. Expected format: active_<int>")
         idx = int(key.split("_", 1)[1])
         if idx >= len(active_dims):
-            raise ValueError(
-                f"Routing key {key!r} references active dim index {idx}, "
-                f"but sweep found only {len(active_dims)} active dims. "
-                "Use more active dims or adjust the sweep threshold."
-            )
+            continue
         resolved[active_dims[idx]] = (algo_name, gain)
     return resolved
+
+
+def _fit_to_observed_range(values: np.ndarray, lo: float, hi: float, margin: float) -> np.ndarray:
+    """Scale one source trajectory into a dimension's observed latent range."""
+    center = (lo + hi) * 0.5
+    half_width = (hi - lo) * 0.5 * margin
+    if half_width <= 0.0:
+        return np.full_like(values, center)
+
+    vmin = float(values.min())
+    vmax = float(values.max())
+    if np.isclose(vmin, vmax):
+        if vmax > 0.0:
+            return np.full_like(values, center + half_width)
+        if vmax < 0.0:
+            return np.full_like(values, center - half_width)
+        return np.full_like(values, min(max(0.0, center - half_width), center + half_width))
+
+    normalized = ((values - vmin) / (vmax - vmin)) * 2.0 - 1.0
+    return center + normalized * half_width
 
 
 def build_latents(
@@ -54,6 +70,8 @@ def build_latents(
     global_seed: int,
     sr_latent: float,
     sweep_cache: dict,
+    fit_observed: bool = False,
+    fit_margin: float = 0.95,
 ) -> tuple:
     """Build the (n_steps, n_latents) latent matrix.
 
@@ -95,6 +113,11 @@ def build_latents(
         obs = observed_ranges.get(str(dim))
         if obs is not None:
             lo, hi = obs
+            exceeds_observed = bool(np.any((values < lo) | (values > hi)))
+            should_fit = fit_observed is True or fit_observed == "always"
+            should_fit = should_fit or (fit_observed == "if_needed" and exceeds_observed)
+            if should_fit:
+                values = _fit_to_observed_range(values, lo, hi, fit_margin)
             out_mask = (values < lo) | (values > hi)
             n_out = int(out_mask.sum())
             if n_out:
