@@ -1,9 +1,9 @@
 model = {
-    "path": "./models/sax_soprano_franziskaschroeder_b2048_r48000_z20.ts",
+    "path": "./models/voice_vocalset_b2048_r48000_z16.ts",
     "attrs": {},
     "sample_rate": 48000,
     "block_size": 2048,
-    "n_latents": 20,
+    "n_latents": 16,
 }
 
 global_config = {
