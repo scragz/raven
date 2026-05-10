@@ -3,7 +3,7 @@
 Cache format (written alongside the model file as <model_name>.sweep.json):
     {
         "active_dims":    [7, 3, 11, 2, ...],   # indices ranked by rms_variance, above threshold
-        "observed_ranges": {"7": [-1.2, 1.4], ...},  # latent input range where dim produces audible output
+        "observed_ranges": {"7": [-1.2, 1.4], ...},  # latent input range producing audible output
         "rms_variance":   {"7": 0.43, ...}       # variance of per-step RMS across the sweep
     }
 
@@ -54,7 +54,7 @@ def _run_sweep(model, model_cfg: dict, sweep_cfg: dict) -> dict:
             latent = np.zeros(n_latents)
             latent[dim] = float(v)
             audio = model.decode(latent)
-            rms_vals[i] = float(np.sqrt(np.mean(audio ** 2)))
+            rms_vals[i] = float(np.sqrt(np.mean(audio**2)))
 
         variance = float(np.var(rms_vals))
         rms_variances[dim] = variance
@@ -67,18 +67,13 @@ def _run_sweep(model, model_cfg: dict, sweep_cfg: dict) -> dict:
             # Dim appears silent; fall back to full sweep range
             observed_ranges[dim] = [float(lo), float(hi)]
 
-        logger.debug(
-            f"  dim {dim:2d}: var={variance:.5f}  "
-            f"range={observed_ranges[dim]}"
-        )
+        logger.debug(f"  dim {dim:2d}: var={variance:.5f}  range={observed_ranges[dim]}")
 
     # Rank by variance descending, filter by threshold
     ranked = sorted(rms_variances.items(), key=lambda kv: -kv[1])
     active_dims = [dim for dim, var in ranked if var > var_threshold]
 
-    logger.info(
-        f"Active dims ({len(active_dims)} of {n_latents}): {active_dims}"
-    )
+    logger.info(f"Active dims ({len(active_dims)} of {n_latents}): {active_dims}")
 
     return {
         "active_dims": active_dims,

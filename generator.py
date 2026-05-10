@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from routing import resolve_routing, build_latents
+from routing import build_latents, resolve_routing
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +94,7 @@ def generate_collection(
 
     # Sidecar JSON
     used_algos = {
-        algo_name: algorithms_cfg[algo_name]
-        for _, (algo_name, _) in collection["routing"].items()
+        algo_name: algorithms_cfg[algo_name] for _, (algo_name, _) in collection["routing"].items()
     }
     sidecar = {
         "collection_name": collection_name,
@@ -109,10 +108,7 @@ def generate_collection(
         "active_dims": active_dims,
         "observed_ranges": sweep_cache.get("observed_ranges", {}),
         "rms_variance": sweep_cache.get("rms_variance", {}),
-        "routing_resolved": {
-            str(dim): [algo, gain]
-            for dim, (algo, gain) in resolved.items()
-        },
+        "routing_resolved": {str(dim): [algo, gain] for dim, (algo, gain) in resolved.items()},
         "warnings": warnings,
     }
 
@@ -141,8 +137,6 @@ def run_batch(model, config: dict, sweep_cache: dict, global_seed: int) -> list:
             global_seed=global_seed,
             timestamp=timestamp,
         )
-        results.append(
-            {"collection": collection_name, "wav": wav_path, "warnings": warnings}
-        )
+        results.append({"collection": collection_name, "wav": wav_path, "warnings": warnings})
 
     return results

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 def _derive_seed(global_seed: int, algo_name: str, dim: int) -> int:
     """Stable, order-independent per-source seed derived from global seed."""
     key = f"{global_seed}:{algo_name}:{dim}"
-    return int(hashlib.md5(key.encode()).hexdigest(), 16) % (2 ** 31)
+    return int(hashlib.md5(key.encode()).hexdigest(), 16) % (2**31)
 
 
 def resolve_routing(collection_routing: dict, active_dims: list) -> dict:
@@ -33,9 +33,7 @@ def resolve_routing(collection_routing: dict, active_dims: list) -> dict:
     resolved: dict[int, tuple] = {}
     for key, (algo_name, gain) in collection_routing.items():
         if not key.startswith("active_"):
-            raise ValueError(
-                f"Invalid routing key {key!r}. Expected format: active_<int>"
-            )
+            raise ValueError(f"Invalid routing key {key!r}. Expected format: active_<int>")
         idx = int(key.split("_", 1)[1])
         if idx >= len(active_dims):
             raise ValueError(

@@ -10,13 +10,14 @@ generators (sine, pulse, constant) ignore it.
 
 import numpy as np
 
-
 # ---------------------------------------------------------------------------
 # Lorenz attractor
 # ---------------------------------------------------------------------------
 
-def _lorenz_euler(n_steps: int, sigma: float, rho: float, beta: float,
-                  dt: float, x0: float, y0: float, z0: float):
+
+def _lorenz_euler(
+    n_steps: int, sigma: float, rho: float, beta: float, dt: float, x0: float, y0: float, z0: float
+):
     xs = np.empty(n_steps)
     ys = np.empty(n_steps)
     zs = np.empty(n_steps)
@@ -34,11 +35,18 @@ def _lorenz_euler(n_steps: int, sigma: float, rho: float, beta: float,
     return xs, ys, zs
 
 
-def lorenz(n_steps: int, sr_latent: float, seed: int,
-           component: str = "x",
-           sigma: float = 10.0, rho: float = 28.0, beta: float = 2.667,
-           scale: float = 0.1, dt: float = 0.01,
-           init=None) -> np.ndarray:
+def lorenz(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    component: str = "x",
+    sigma: float = 10.0,
+    rho: float = 28.0,
+    beta: float = 2.667,
+    scale: float = 0.1,
+    dt: float = 0.01,
+    init=None,
+) -> np.ndarray:
     rng = np.random.default_rng(seed)
     if init is None:
         x0, y0, z0 = rng.uniform(-1.0, 1.0, 3)
@@ -54,8 +62,10 @@ def lorenz(n_steps: int, sr_latent: float, seed: int,
 # Brownian motion
 # ---------------------------------------------------------------------------
 
-def brownian(n_steps: int, sr_latent: float, seed: int,
-             sigma: float = 0.05, clip=None) -> np.ndarray:
+
+def brownian(
+    n_steps: int, sr_latent: float, seed: int, sigma: float = 0.05, clip=None
+) -> np.ndarray:
     rng = np.random.default_rng(seed)
     steps = rng.normal(0.0, sigma, n_steps)
     trajectory = np.cumsum(steps)
@@ -68,9 +78,15 @@ def brownian(n_steps: int, sr_latent: float, seed: int,
 # Sine wave
 # ---------------------------------------------------------------------------
 
-def sine(n_steps: int, sr_latent: float, seed: int,
-         freq_hz: float = 0.1, amplitude: float = 1.0,
-         phase: float = 0.0) -> np.ndarray:
+
+def sine(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    freq_hz: float = 0.1,
+    amplitude: float = 1.0,
+    phase: float = 0.0,
+) -> np.ndarray:
     t = np.arange(n_steps) / sr_latent
     return amplitude * np.sin(2.0 * np.pi * freq_hz * t + phase)
 
@@ -79,9 +95,15 @@ def sine(n_steps: int, sr_latent: float, seed: int,
 # Pulse (hard square wave)
 # ---------------------------------------------------------------------------
 
-def pulse(n_steps: int, sr_latent: float, seed: int,
-          rate_hz: float = 0.1, duty: float = 0.5,
-          amplitude: float = 2.0) -> np.ndarray:
+
+def pulse(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    rate_hz: float = 0.1,
+    duty: float = 0.5,
+    amplitude: float = 2.0,
+) -> np.ndarray:
     t = np.arange(n_steps) / sr_latent
     phase = (t * rate_hz) % 1.0
     return np.where(phase < duty, amplitude, 0.0)
@@ -91,8 +113,8 @@ def pulse(n_steps: int, sr_latent: float, seed: int,
 # Constant
 # ---------------------------------------------------------------------------
 
-def constant(n_steps: int, sr_latent: float, seed: int,
-             value: float = 0.0) -> np.ndarray:
+
+def constant(n_steps: int, sr_latent: float, seed: int, value: float = 0.0) -> np.ndarray:
     return np.full(n_steps, float(value))
 
 
@@ -100,8 +122,10 @@ def constant(n_steps: int, sr_latent: float, seed: int,
 # White noise / random
 # ---------------------------------------------------------------------------
 
-def random(n_steps: int, sr_latent: float, seed: int,
-           distribution: str = "uniform", scale: float = 1.0) -> np.ndarray:
+
+def random(
+    n_steps: int, sr_latent: float, seed: int, distribution: str = "uniform", scale: float = 1.0
+) -> np.ndarray:
     rng = np.random.default_rng(seed)
     if distribution == "uniform":
         return rng.uniform(-scale, scale, n_steps)
@@ -125,11 +149,7 @@ REGISTRY: dict = {
 }
 
 
-def make_source(algo_type: str, n_steps: int, sr_latent: float,
-                seed: int, **params) -> np.ndarray:
+def make_source(algo_type: str, n_steps: int, sr_latent: float, seed: int, **params) -> np.ndarray:
     if algo_type not in REGISTRY:
-        raise ValueError(
-            f"Unknown algorithm type {algo_type!r}. "
-            f"Available: {list(REGISTRY)}"
-        )
+        raise ValueError(f"Unknown algorithm type {algo_type!r}. Available: {list(REGISTRY)}")
     return REGISTRY[algo_type](n_steps, sr_latent, seed, **params)

@@ -49,9 +49,7 @@ class RAVEModel:
                     f"(tried: {attr_names}); trusting config value {expected}"
                 )
             elif actual != expected:
-                raise ValueError(
-                    f"Model {label} mismatch: model={actual}, config={expected}"
-                )
+                raise ValueError(f"Model {label} mismatch: model={actual}, config={expected}")
             else:
                 logger.debug(f"  {label}: {actual} ✓")
 
@@ -74,7 +72,7 @@ class RAVEModel:
         """
         z = (
             torch.from_numpy(latent_vector.astype(np.float32))
-            .unsqueeze(0)   # (1, n_latents)
+            .unsqueeze(0)  # (1, n_latents)
             .unsqueeze(-1)  # (1, n_latents, 1)
         )
         with torch.no_grad():

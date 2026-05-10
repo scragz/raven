@@ -26,8 +26,10 @@ logger = logging.getLogger(__name__)
 
 def load_config(config_path: str) -> dict:
     spec = importlib.util.spec_from_file_location("_raven_config", config_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load config from {config_path!r}")
     mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
+    spec.loader.exec_module(mod)  # type: ignore[union-attr]
     return {
         "model": mod.model,
         "global_config": mod.global_config,
@@ -39,9 +41,7 @@ def load_config(config_path: str) -> dict:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Raven: RAVE Latent Trajectory Generator"
-    )
+    parser = argparse.ArgumentParser(description="Raven: RAVE Latent Trajectory Generator")
     parser.add_argument(
         "config",
         nargs="?",
@@ -59,7 +59,7 @@ def main() -> int:
     # Seed
     seed = config["global_config"].get("seed")
     if seed is None:
-        seed = int(np.random.SeedSequence().entropy & 0x7FFF_FFFF)
+        seed = int(np.random.default_rng().integers(0, 2**31))
     np.random.seed(seed)
     logger.info(f"Global seed: {seed}")
 
@@ -72,9 +72,7 @@ def main() -> int:
     logger.info(f"Active dims: {n_active}  →  {sweep_cache['active_dims']}")
 
     if n_active == 0:
-        logger.error(
-            "No active dims found. Lower sweep.threshold or check your model."
-        )
+        logger.error("No active dims found. Lower sweep.threshold or check your model.")
         return 1
 
     # Check that every collection's routing can be satisfied
@@ -102,10 +100,7 @@ def main() -> int:
 
     total_warnings = sum(len(r["warnings"]) for r in results)
     if total_warnings:
-        print(
-            f"\n{total_warnings} out-of-range warning(s) logged. "
-            "Check sidecar JSON for details."
-        )
+        print(f"\n{total_warnings} out-of-range warning(s) logged. Check sidecar JSON for details.")
 
     return 0
 
