@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
-from routing import build_latents, resolve_routing
+from .routing import build_latents, resolve_routing
 
 logger = logging.getLogger(__name__)
 

@@ -13,7 +13,7 @@ import logging
 
 import numpy as np
 
-from sources import make_source
+from .sources import make_source
 
 logger = logging.getLogger(__name__)
 

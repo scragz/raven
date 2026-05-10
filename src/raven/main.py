@@ -2,19 +2,22 @@
 """Raven — RAVE Latent Trajectory Generator.
 
 Usage:
-    python main.py [config.py] [--debug]
+    raven [config.py] [--debug]
+    python -m raven [config.py] [--debug]
 """
 
 import argparse
+import importlib
 import importlib.util
 import logging
 import sys
+from pathlib import Path
 
 import numpy as np
 
-from generator import run_batch
-from model import RAVEModel
-from sweep import sweep_dimensions
+from .generator import run_batch
+from .model import RAVEModel
+from .sweep import sweep_dimensions
 
 logging.basicConfig(
     level=logging.INFO,
@@ -25,11 +28,18 @@ logger = logging.getLogger(__name__)
 
 
 def load_config(config_path: str) -> dict:
-    spec = importlib.util.spec_from_file_location("_raven_config", config_path)
-    if spec is None or spec.loader is None:
-        raise RuntimeError(f"Cannot load config from {config_path!r}")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    path = Path(config_path)
+    if path.exists():
+        spec = importlib.util.spec_from_file_location("_raven_config", path)
+        if spec is None or spec.loader is None:
+            raise RuntimeError(f"Cannot load config from {config_path!r}")
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+    elif config_path == "config.py":
+        logger.info("No ./config.py found; using bundled raven.config defaults")
+        mod = importlib.import_module(".config", package=__package__)
+    else:
+        raise FileNotFoundError(f"Config file not found: {config_path}")
     return {
         "model": mod.model,
         "global_config": mod.global_config,

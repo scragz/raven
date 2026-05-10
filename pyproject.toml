@@ -1,6 +1,6 @@
 [build-system]
 requires = ["setuptools>=68"]
-build-backend = "setuptools.backends.legacy:build"
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "raven"
@@ -22,10 +22,10 @@ dev = [
 ]
 
 [project.scripts]
-raven = "main:main"
+raven = "raven.main:main"
 
-[tool.setuptools]
-py-modules = ["generator", "main", "model", "routing", "sources", "sweep"]
+[tool.setuptools.packages.find]
+where = ["src"]
 
 # ---------------------------------------------------------------------------
 # Ruff — linting + formatting
@@ -52,7 +52,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.isort]
-known-first-party = ["model", "sources", "sweep", "routing", "generator"]
+known-first-party = ["raven"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -64,7 +64,7 @@ indent-style = "space"
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "standard"
-include = ["."]
+include = ["src"]
 exclude = ["output", "models", ".git", ".venv", "venv"]
 # torch / soundfile / scipy ship their own stubs or are missing stubs entirely;
 # downgrade to warning so the type-checker stays usable without a full install.
