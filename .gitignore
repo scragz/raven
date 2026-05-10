@@ -217,6 +217,10 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+# OS
+.DS_Store
+Thumbs.db
+
 # Raven
 models/*
 output/*
