@@ -36,6 +36,17 @@ def _load_cache(model_path: str) -> dict:
     return data
 
 
+def _cache_matches(data: dict, model_cfg: dict, sweep_cfg: dict) -> bool:
+    params = data.get("sweep")
+    expected = {
+        "n_latents": model_cfg["n_latents"],
+        "range": sweep_cfg["range"],
+        "steps": sweep_cfg["steps"],
+        "threshold": sweep_cfg["threshold"],
+    }
+    return params == expected
+
+
 def _run_sweep(model, model_cfg: dict, sweep_cfg: dict) -> dict:
     n_latents = model_cfg["n_latents"]
     lo, hi = sweep_cfg["range"]
@@ -76,6 +87,12 @@ def _run_sweep(model, model_cfg: dict, sweep_cfg: dict) -> dict:
     logger.info(f"Active dims ({len(active_dims)} of {n_latents}): {active_dims}")
 
     return {
+        "sweep": {
+            "n_latents": n_latents,
+            "range": sweep_cfg["range"],
+            "steps": steps,
+            "threshold": var_threshold,
+        },
         "active_dims": active_dims,
         "observed_ranges": {str(k): v for k, v in observed_ranges.items()},
         "rms_variance": {str(k): float(v) for k, v in rms_variances.items()},
@@ -98,8 +115,11 @@ def sweep_dimensions(model, model_cfg: dict, sweep_cfg: dict) -> dict:
         )
 
     if use_cache and cache_path.exists():
-        logger.info(f"Loading sweep cache from {cache_path}")
-        return _load_cache(model_cfg["path"])
+        cached = _load_cache(model_cfg["path"])
+        if _cache_matches(cached, model_cfg, sweep_cfg):
+            logger.info(f"Loading sweep cache from {cache_path}")
+            return cached
+        logger.info(f"Sweep cache at {cache_path} does not match current parameters; rebuilding")
 
     result = _run_sweep(model, model_cfg, sweep_cfg)
 
