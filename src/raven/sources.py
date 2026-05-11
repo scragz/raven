@@ -68,6 +68,61 @@ def lorenz(
 
 
 # ---------------------------------------------------------------------------
+# Rossler attractor
+# ---------------------------------------------------------------------------
+
+
+def rossler(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    component: str = "x",
+    a: float = 0.2,
+    b: float = 0.2,
+    c: float = 5.7,
+    dt: float = 0.04,
+    scale: float = 0.2,
+    init=None,
+) -> np.ndarray:
+    """Rossler attractor with RK4 integration."""
+    rng = np.random.default_rng(seed)
+    if init is None:
+        x, y, z = rng.uniform(-1.0, 1.0, 3)
+    else:
+        x, y, z = init
+
+    xs = np.empty(n_steps)
+    ys = np.empty(n_steps)
+    zs = np.empty(n_steps)
+
+    def deriv(state_x: float, state_y: float, state_z: float) -> tuple[float, float, float]:
+        return -state_y - state_z, state_x + a * state_y, b + state_z * (state_x - c)
+
+    for i in range(n_steps):
+        k1x, k1y, k1z = deriv(x, y, z)
+        k2x, k2y, k2z = deriv(
+            x + 0.5 * dt * k1x,
+            y + 0.5 * dt * k1y,
+            z + 0.5 * dt * k1z,
+        )
+        k3x, k3y, k3z = deriv(
+            x + 0.5 * dt * k2x,
+            y + 0.5 * dt * k2y,
+            z + 0.5 * dt * k2z,
+        )
+        k4x, k4y, k4z = deriv(x + dt * k3x, y + dt * k3y, z + dt * k3z)
+        x += (dt / 6.0) * (k1x + 2.0 * k2x + 2.0 * k3x + k4x)
+        y += (dt / 6.0) * (k1y + 2.0 * k2y + 2.0 * k3y + k4y)
+        z += (dt / 6.0) * (k1z + 2.0 * k2z + 2.0 * k3z + k4z)
+        xs[i] = x
+        ys[i] = y
+        zs[i] = z
+
+    out = {"x": xs, "y": ys, "z": zs}[component]
+    return _centered_peak_scale(out, scale)
+
+
+# ---------------------------------------------------------------------------
 # Duffing oscillator
 # ---------------------------------------------------------------------------
 
@@ -177,6 +232,41 @@ def ikeda(
     return (out * scale).astype(np.float64)
 
 
+def standard_map(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    component: str = "sin",
+    k: float = 5.2,
+    drift: float = 0.0,
+    scale: float = 1.0,
+    init=None,
+) -> np.ndarray:
+    """Chaotic Chirikov standard map on a wrapped phase plane."""
+    rng = np.random.default_rng(seed)
+    if init is None:
+        theta = rng.uniform(0.0, 2.0 * np.pi)
+        momentum = rng.uniform(-np.pi, np.pi)
+    else:
+        theta, momentum = init
+
+    values = np.empty(n_steps)
+    for i in range(n_steps):
+        momentum = (momentum + k * np.sin(theta) + drift + np.pi) % (2.0 * np.pi) - np.pi
+        theta = (theta + momentum) % (2.0 * np.pi)
+        if component == "sin":
+            value = np.sin(theta)
+        elif component == "cos":
+            value = np.cos(theta)
+        elif component == "momentum":
+            value = momentum / np.pi
+        else:
+            raise ValueError(f"Unknown standard_map component: {component!r}")
+        values[i] = value
+
+    return (values * scale).astype(np.float64)
+
+
 # ---------------------------------------------------------------------------
 # Coupled map lattice
 # ---------------------------------------------------------------------------
@@ -276,6 +366,51 @@ def reaction_diffusion(
             value = 0.0 if total <= 1e-12 else float(np.dot(np.arange(n_cells), v) / total)
         else:
             raise ValueError(f"Unknown reaction_diffusion statistic: {statistic!r}")
+        out[i] = value
+
+    return _centered_peak_scale(out, scale)
+
+
+# ---------------------------------------------------------------------------
+# Binary cellular automata
+# ---------------------------------------------------------------------------
+
+
+def cellular_automaton(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    rule: int = 30,
+    n_cells: int = 257,
+    substeps: int = 4,
+    statistic: str = "edge",
+    cell: int = 0,
+    scale: float = 2.0,
+) -> np.ndarray:
+    """Elementary cellular automaton projected through density/edge probes."""
+    rng = np.random.default_rng(seed)
+    state = rng.integers(0, 2, n_cells, dtype=np.uint8)
+    table = np.array([(rule >> idx) & 1 for idx in range(8)], dtype=np.uint8)
+    weights = np.hanning(n_cells)
+    out = np.empty(n_steps)
+
+    for i in range(n_steps):
+        for _ in range(substeps):
+            left = np.roll(state, 1)
+            right = np.roll(state, -1)
+            idx = (left << 2) | (state << 1) | right
+            state = table[idx]
+
+        if statistic == "density":
+            value = float(np.mean(state))
+        elif statistic == "edge":
+            value = float(np.mean(state != np.roll(state, 1)))
+        elif statistic == "cell":
+            value = float(state[cell % n_cells])
+        elif statistic == "window":
+            value = float(np.dot(state, weights) / np.sum(weights))
+        else:
+            raise ValueError(f"Unknown cellular_automaton statistic: {statistic!r}")
         out[i] = value
 
     return _centered_peak_scale(out, scale)
@@ -401,11 +536,14 @@ def random(
 
 REGISTRY: dict = {
     "lorenz": lorenz,
+    "rossler": rossler,
     "duffing": duffing,
     "henon": henon,
     "ikeda": ikeda,
+    "standard_map": standard_map,
     "logistic_lattice": logistic_lattice,
     "reaction_diffusion": reaction_diffusion,
+    "cellular_automaton": cellular_automaton,
     "oscillator_bank": oscillator_bank,
     "brownian": brownian,
     "sine": sine,
