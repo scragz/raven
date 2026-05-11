@@ -13,22 +13,43 @@ model_organ_archive_b2048_r48000_z16 = {
     "n_latents": 16,
 }
 
-
 model_guitar_iil_b2048_r48000_z16 = {
     "path": "./models/guitar_iil_b2048_r48000_z16.ts",
     "n_latents": 16,
 }
 
-model = model_organ_archive_b2048_r48000_z16 | {
+model_voice_multi_b2048_r48000_z11 = {
+    "path": "./models/voice_multi_b2048_r48000_z11.ts",
+    "n_latents": 11,
+}
+
+model_crozzoli_bigensemblesmusic_18d = {
+    "path": "./models/crozzoli_bigensemblesmusic_18d.ts",
+    "n_latents": 18,
+    "sample_rate": 44100,
+}
+
+model_birds_dawnchorus_b2048_r48000_z8 = {
+    "path": "./models/birds_dawnchorus_b2048_r48000_z8.ts",
+    "n_latents": 8,
+}
+
+model_birds_motherbird_b2048_r48000_z16 = {
+    "path": "./models/birds_motherbird_b2048_r48000_z16.ts",
+    "n_latents": 16,
+    "sample_rate": 44100,
+}
+
+model =  {
     "attrs": {},
     "sample_rate": 48000,
     "block_size": 2048,
-}
+} | model_birds_motherbird_b2048_r48000_z16
 
 global_config = {
     "output_dir": "./output/",
     "duration": 120.0,
-    "seed": 98653861,
+    "seed": 875983256,
     "normalize": True,
 }
 
