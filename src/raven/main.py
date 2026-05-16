@@ -44,7 +44,7 @@ def load_config(config_path: str) -> dict:
         "model": mod.model,
         "global_config": mod.global_config,
         "sweep": mod.sweep,
-        "algorithms": mod.algorithms,
+        "sources": mod.sources,
         "collections": mod.collections,
         "batch": mod.batch,
     }
