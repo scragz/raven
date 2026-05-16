@@ -2,15 +2,18 @@
 
 Cache format (written alongside the model file as <model_name>.sweep.json):
     {
-        "active_dims":    [7, 3, 11, 2, ...],   # indices ranked by rms_variance, above threshold
-        "observed_ranges": {"7": [-1.2, 1.4], ...},  # latent input range producing audible output
-        "rms_variance":   {"7": 0.43, ...}       # variance of per-step RMS across the sweep
+        "active_dims":      [7, 3, 11, 2, ...],  # indices ranked by combined score, above threshold
+        "observed_ranges":  {"7": [-1.2, 1.4], ...},
+        "rms_variance":     {"7": 0.43, ...},
+        "timbral_variance": {"7": 1820.4, ...}   # variance of spectral centroid across sweep
     }
 
-observed_ranges[dim] = [min_input, max_input] over the sweep steps where the
-decoded audio RMS is above a small noise floor (1e-4).  This is the "active
-input region" for that dimension.  At decode time a warning is emitted when a
-source drives a dim outside its observed range.
+Ranking uses a combined score:
+    score = normalised(rms_variance) + timbral_weight * normalised(timbral_variance)
+
+so that dims which modulate timbre without strongly changing energy are not
+buried at the bottom of the active_dims list.  timbral_weight defaults to 0.2
+and can be set in sweep config.
 """
 
 import json
@@ -43,46 +46,70 @@ def _cache_matches(data: dict, model_cfg: dict, sweep_cfg: dict) -> bool:
         "range": sweep_cfg["range"],
         "steps": sweep_cfg["steps"],
         "threshold": sweep_cfg["threshold"],
+        "timbral_weight": sweep_cfg.get("timbral_weight", 0.2),
     }
     return params == expected
 
 
+def _spectral_centroid(audio: np.ndarray, sr: int) -> float:
+    fft_mag = np.abs(np.fft.rfft(audio))
+    freqs = np.fft.rfftfreq(len(audio), d=1.0 / sr)
+    total = float(np.sum(fft_mag))
+    if total < 1e-10:
+        return 0.0
+    return float(np.dot(freqs, fft_mag) / total)
+
+
 def _run_sweep(model, model_cfg: dict, sweep_cfg: dict) -> dict:
     n_latents = model_cfg["n_latents"]
+    sr = model_cfg["sample_rate"]
     lo, hi = sweep_cfg["range"]
     steps = sweep_cfg["steps"]
     var_threshold = sweep_cfg["threshold"]
+    timbral_weight = sweep_cfg.get("timbral_weight", 0.2)
 
     values = np.linspace(lo, hi, steps)
     rms_variances: dict[int, float] = {}
+    timbral_variances: dict[int, float] = {}
     observed_ranges: dict[int, list] = {}
 
     logger.info(f"Sweeping {n_latents} latent dims ({steps} steps each)…")
 
     for dim in range(n_latents):
         rms_vals = np.empty(steps)
+        centroid_vals = np.empty(steps)
+
         for i, v in enumerate(values):
             latent = np.zeros(n_latents)
             latent[dim] = float(v)
             audio = model.decode(latent)
             rms_vals[i] = float(np.sqrt(np.mean(audio**2)))
+            centroid_vals[i] = _spectral_centroid(audio, sr)
 
-        variance = float(np.var(rms_vals))
-        rms_variances[dim] = variance
+        rms_variances[dim] = float(np.var(rms_vals))
+        timbral_variances[dim] = float(np.var(centroid_vals))
 
-        # Active input range: sweep values that produced audible output
         active_inputs = values[rms_vals > _NOISE_FLOOR]
         if len(active_inputs) >= 2:
             observed_ranges[dim] = [float(active_inputs[0]), float(active_inputs[-1])]
         else:
-            # Dim appears silent; fall back to full sweep range
             observed_ranges[dim] = [float(lo), float(hi)]
 
-        logger.debug(f"  dim {dim:2d}: var={variance:.5f}  range={observed_ranges[dim]}")
+        logger.debug(
+            f"  dim {dim:2d}: rms_var={rms_variances[dim]:.5f}  "
+            f"tmb_var={timbral_variances[dim]:.1f}  range={observed_ranges[dim]}"
+        )
 
-    # Rank by variance descending, filter by threshold
-    ranked = sorted(rms_variances.items(), key=lambda kv: -kv[1])
-    active_dims = [dim for dim, var in ranked if var > var_threshold]
+    # Combined ranking: normalise both metrics to [0,1] then blend
+    rms_arr = np.array([rms_variances[d] for d in range(n_latents)])
+    tmb_arr = np.array([timbral_variances[d] for d in range(n_latents)])
+    rms_norm = rms_arr / (rms_arr.max() + 1e-12)
+    tmb_norm = tmb_arr / (tmb_arr.max() + 1e-12)
+    combined = {d: float(rms_norm[d] + timbral_weight * tmb_norm[d]) for d in range(n_latents)}
+
+    ranked = sorted(combined.items(), key=lambda kv: -kv[1])
+    # Filter: must exceed rms threshold to qualify as active at all
+    active_dims = [dim for dim, _ in ranked if rms_variances[dim] > var_threshold]
 
     logger.info(f"Active dims ({len(active_dims)} of {n_latents}): {active_dims}")
 
@@ -92,10 +119,12 @@ def _run_sweep(model, model_cfg: dict, sweep_cfg: dict) -> dict:
             "range": sweep_cfg["range"],
             "steps": steps,
             "threshold": var_threshold,
+            "timbral_weight": timbral_weight,
         },
         "active_dims": active_dims,
         "observed_ranges": {str(k): v for k, v in observed_ranges.items()},
         "rms_variance": {str(k): float(v) for k, v in rms_variances.items()},
+        "timbral_variance": {str(k): float(v) for k, v in timbral_variances.items()},
     }
 
 

@@ -6,6 +6,10 @@ Each generator signature:
 sr_latent = sample_rate / block_size  (~23.4 Hz for 48 kHz / 2048)
 seed is an int used to initialise a local numpy Generator; deterministic
 generators (sine, pulse, constant) ignore it.
+
+All stochastic/chaotic sources apply _centered_peak_scale so that scale=1.0
+produces a peak absolute value of ~1.0. Routing gains then set the actual
+latent amplitude.
 """
 
 import numpy as np
@@ -20,24 +24,29 @@ def _centered_peak_scale(values: np.ndarray, scale: float) -> np.ndarray:
 
 
 # ---------------------------------------------------------------------------
-# Lorenz attractor
+# Lorenz attractor (RK4)
 # ---------------------------------------------------------------------------
 
 
-def _lorenz_euler(
+def _lorenz_rk4(
     n_steps: int, sigma: float, rho: float, beta: float, dt: float, x0: float, y0: float, z0: float
 ):
     xs = np.empty(n_steps)
     ys = np.empty(n_steps)
     zs = np.empty(n_steps)
     x, y, z = x0, y0, z0
+
+    def deriv(x: float, y: float, z: float) -> tuple[float, float, float]:
+        return sigma * (y - x), x * (rho - z) - y, x * y - beta * z
+
     for i in range(n_steps):
-        dx = sigma * (y - x)
-        dy = x * (rho - z) - y
-        dz = x * y - beta * z
-        x += dx * dt
-        y += dy * dt
-        z += dz * dt
+        dx1, dy1, dz1 = deriv(x, y, z)
+        dx2, dy2, dz2 = deriv(x + 0.5 * dt * dx1, y + 0.5 * dt * dy1, z + 0.5 * dt * dz1)
+        dx3, dy3, dz3 = deriv(x + 0.5 * dt * dx2, y + 0.5 * dt * dy2, z + 0.5 * dt * dz2)
+        dx4, dy4, dz4 = deriv(x + dt * dx3, y + dt * dy3, z + dt * dz3)
+        x += (dt / 6.0) * (dx1 + 2.0 * dx2 + 2.0 * dx3 + dx4)
+        y += (dt / 6.0) * (dy1 + 2.0 * dy2 + 2.0 * dy3 + dy4)
+        z += (dt / 6.0) * (dz1 + 2.0 * dz2 + 2.0 * dz3 + dz4)
         xs[i] = x
         ys[i] = y
         zs[i] = z
@@ -52,7 +61,7 @@ def lorenz(
     sigma: float = 10.0,
     rho: float = 28.0,
     beta: float = 2.667,
-    scale: float = 0.1,
+    scale: float = 1.0,
     dt: float = 0.01,
     init=None,
 ) -> np.ndarray:
@@ -61,14 +70,13 @@ def lorenz(
         x0, y0, z0 = rng.uniform(-1.0, 1.0, 3)
     else:
         x0, y0, z0 = init
-
-    xs, ys, zs = _lorenz_euler(n_steps, sigma, rho, beta, dt, x0, y0, z0)
+    xs, ys, zs = _lorenz_rk4(n_steps, sigma, rho, beta, dt, x0, y0, z0)
     out = {"x": xs, "y": ys, "z": zs}[component]
-    return (out * scale).astype(np.float64)
+    return _centered_peak_scale(out, scale)
 
 
 # ---------------------------------------------------------------------------
-# Rossler attractor
+# Rossler attractor (RK4)
 # ---------------------------------------------------------------------------
 
 
@@ -81,10 +89,9 @@ def rossler(
     b: float = 0.2,
     c: float = 5.7,
     dt: float = 0.04,
-    scale: float = 0.2,
+    scale: float = 1.0,
     init=None,
 ) -> np.ndarray:
-    """Rossler attractor with RK4 integration."""
     rng = np.random.default_rng(seed)
     if init is None:
         x, y, z = rng.uniform(-1.0, 1.0, 3)
@@ -95,21 +102,13 @@ def rossler(
     ys = np.empty(n_steps)
     zs = np.empty(n_steps)
 
-    def deriv(state_x: float, state_y: float, state_z: float) -> tuple[float, float, float]:
-        return -state_y - state_z, state_x + a * state_y, b + state_z * (state_x - c)
+    def deriv(sx: float, sy: float, sz: float) -> tuple[float, float, float]:
+        return -sy - sz, sx + a * sy, b + sz * (sx - c)
 
     for i in range(n_steps):
         k1x, k1y, k1z = deriv(x, y, z)
-        k2x, k2y, k2z = deriv(
-            x + 0.5 * dt * k1x,
-            y + 0.5 * dt * k1y,
-            z + 0.5 * dt * k1z,
-        )
-        k3x, k3y, k3z = deriv(
-            x + 0.5 * dt * k2x,
-            y + 0.5 * dt * k2y,
-            z + 0.5 * dt * k2z,
-        )
+        k2x, k2y, k2z = deriv(x + 0.5 * dt * k1x, y + 0.5 * dt * k1y, z + 0.5 * dt * k1z)
+        k3x, k3y, k3z = deriv(x + 0.5 * dt * k2x, y + 0.5 * dt * k2y, z + 0.5 * dt * k2z)
         k4x, k4y, k4z = deriv(x + dt * k3x, y + dt * k3y, z + dt * k3z)
         x += (dt / 6.0) * (k1x + 2.0 * k2x + 2.0 * k3x + k4x)
         y += (dt / 6.0) * (k1y + 2.0 * k2y + 2.0 * k3y + k4y)
@@ -123,7 +122,7 @@ def rossler(
 
 
 # ---------------------------------------------------------------------------
-# Duffing oscillator
+# Duffing oscillator (RK4)
 # ---------------------------------------------------------------------------
 
 
@@ -141,7 +140,6 @@ def duffing(
     scale: float = 1.0,
     init=None,
 ) -> np.ndarray:
-    """Forced Duffing oscillator with RK4 integration."""
     rng = np.random.default_rng(seed)
     if init is None:
         x, v = rng.uniform(-0.5, 0.5, 2)
@@ -151,9 +149,9 @@ def duffing(
     xs = np.empty(n_steps)
     vs = np.empty(n_steps)
 
-    def deriv(state_x: float, state_v: float, time: float) -> tuple[float, float]:
-        accel = gamma * np.cos(omega * time) - delta * state_v - alpha * state_x - beta * state_x**3
-        return state_v, accel
+    def deriv(sx: float, sv: float, time: float) -> tuple[float, float]:
+        accel = gamma * np.cos(omega * time) - delta * sv - alpha * sx - beta * sx**3
+        return sv, accel
 
     time = 0.0
     for i in range(n_steps):
@@ -168,7 +166,7 @@ def duffing(
         vs[i] = v
 
     out = {"x": xs, "v": vs}[component]
-    return (out * scale).astype(np.float64)
+    return _centered_peak_scale(out, scale)
 
 
 # ---------------------------------------------------------------------------
@@ -200,7 +198,7 @@ def henon(
         ys[i] = y
 
     out = {"x": xs, "y": ys}[component]
-    return (out * scale).astype(np.float64)
+    return _centered_peak_scale(out, scale)
 
 
 def ikeda(
@@ -209,7 +207,7 @@ def ikeda(
     seed: int,
     component: str = "x",
     u: float = 0.918,
-    scale: float = 0.7,
+    scale: float = 1.0,
     init=None,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
@@ -229,7 +227,7 @@ def ikeda(
         ys[i] = y
 
     out = {"x": xs, "y": ys}[component]
-    return (out * scale).astype(np.float64)
+    return _centered_peak_scale(out, scale)
 
 
 def standard_map(
@@ -242,7 +240,6 @@ def standard_map(
     scale: float = 1.0,
     init=None,
 ) -> np.ndarray:
-    """Chaotic Chirikov standard map on a wrapped phase plane."""
     rng = np.random.default_rng(seed)
     if init is None:
         theta = rng.uniform(0.0, 2.0 * np.pi)
@@ -264,7 +261,7 @@ def standard_map(
             raise ValueError(f"Unknown standard_map component: {component!r}")
         values[i] = value
 
-    return (values * scale).astype(np.float64)
+    return _centered_peak_scale(values, scale)
 
 
 # ---------------------------------------------------------------------------
@@ -282,9 +279,8 @@ def logistic_lattice(
     substeps: int = 8,
     statistic: str = "energy",
     cell: int = 0,
-    scale: float = 5.0,
+    scale: float = 1.0,
 ) -> np.ndarray:
-    """Coupled logistic-map lattice; intentionally expensive for tangled motion."""
     rng = np.random.default_rng(seed)
     state = rng.uniform(0.05, 0.95, n_cells)
     out = np.empty(n_steps)
@@ -330,9 +326,8 @@ def reaction_diffusion(
     dv: float = 0.08,
     statistic: str = "spot",
     cell: int = 0,
-    scale: float = 8.0,
+    scale: float = 1.0,
 ) -> np.ndarray:
-    """One-dimensional Gray-Scott system projected to a latent trajectory."""
     rng = np.random.default_rng(seed)
     u = np.ones(n_cells)
     v = np.zeros(n_cells)
@@ -385,9 +380,8 @@ def cellular_automaton(
     substeps: int = 4,
     statistic: str = "edge",
     cell: int = 0,
-    scale: float = 2.0,
+    scale: float = 1.0,
 ) -> np.ndarray:
-    """Elementary cellular automaton projected through density/edge probes."""
     rng = np.random.default_rng(seed)
     state = rng.integers(0, 2, n_cells, dtype=np.uint8)
     table = np.array([(rule >> idx) & 1 for idx in range(8)], dtype=np.uint8)
@@ -432,7 +426,6 @@ def oscillator_bank(
     feedback: float = 0.15,
     scale: float = 1.0,
 ) -> np.ndarray:
-    """Dense beating oscillator cloud with slow random FM and phase feedback."""
     rng = np.random.default_rng(seed)
     freqs = np.exp(rng.uniform(np.log(min_freq_hz), np.log(max_freq_hz), n_oscillators))
     phases = rng.uniform(0.0, 2.0 * np.pi, n_oscillators)
@@ -450,23 +443,61 @@ def oscillator_bank(
         last = float(np.tanh(np.dot(amps, voices)))
         out[i] = last
 
+    return _centered_peak_scale(out, scale)
+
+
+# ---------------------------------------------------------------------------
+# Ornstein-Uhlenbeck process (mean-reverting random walk)
+# ---------------------------------------------------------------------------
+
+
+def ornstein_uhlenbeck(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    theta: float = 0.1,
+    sigma: float = 0.3,
+    mu: float = 0.0,
+    scale: float = 1.0,
+    init: float | None = None,
+) -> np.ndarray:
+    """Mean-reverting random walk; characteristic time constant = 1/theta steps.
+
+    Steady-state std ≈ sigma / sqrt(2 * theta).  With scale=1.0 and typical
+    theta/sigma pairs the output sits roughly in [-2, +2].
+    """
+    rng = np.random.default_rng(seed)
+    dt = 1.0 / sr_latent
+    sqrt_dt = float(np.sqrt(dt))
+    steady_std = sigma / float(np.sqrt(max(2.0 * theta, 1e-12)))
+    x = float(rng.normal(mu, steady_std)) if init is None else float(init)
+    noise = rng.standard_normal(n_steps)
+    out = np.empty(n_steps)
+    for i in range(n_steps):
+        x += theta * (mu - x) * dt + sigma * sqrt_dt * noise[i]
+        out[i] = x
     return (out * scale).astype(np.float64)
 
 
 # ---------------------------------------------------------------------------
-# Brownian motion
+# Pink noise (1/f spectrum via FFT shaping)
 # ---------------------------------------------------------------------------
 
 
-def brownian(
-    n_steps: int, sr_latent: float, seed: int, sigma: float = 0.05, clip=None
+def pink_noise(
+    n_steps: int,
+    sr_latent: float,
+    seed: int,
+    scale: float = 1.0,
 ) -> np.ndarray:
     rng = np.random.default_rng(seed)
-    steps = rng.normal(0.0, sigma, n_steps)
-    trajectory = np.cumsum(steps)
-    if clip is not None:
-        trajectory = np.clip(trajectory, clip[0], clip[1])
-    return trajectory
+    white = rng.standard_normal(n_steps)
+    fft = np.fft.rfft(white)
+    freqs = np.fft.rfftfreq(n_steps)
+    freqs[0] = 1.0  # avoid DC singularity
+    fft /= np.sqrt(freqs)
+    pink = np.fft.irfft(fft, n_steps)
+    return _centered_peak_scale(pink, scale)
 
 
 # ---------------------------------------------------------------------------
@@ -497,7 +528,7 @@ def pulse(
     seed: int,
     rate_hz: float = 0.1,
     duty: float = 0.5,
-    amplitude: float = 2.0,
+    amplitude: float = 1.0,
 ) -> np.ndarray:
     t = np.arange(n_steps) / sr_latent
     phase = (t * rate_hz) % 1.0
@@ -545,7 +576,8 @@ REGISTRY: dict = {
     "reaction_diffusion": reaction_diffusion,
     "cellular_automaton": cellular_automaton,
     "oscillator_bank": oscillator_bank,
-    "brownian": brownian,
+    "ornstein_uhlenbeck": ornstein_uhlenbeck,
+    "pink_noise": pink_noise,
     "sine": sine,
     "pulse": pulse,
     "constant": constant,

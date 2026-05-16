@@ -40,7 +40,7 @@ def generate_collection(
     model_cfg = config["model"]
     global_cfg = config["global_config"]
     collection = config["collections"][collection_name]
-    algorithms_cfg = config["algorithms"]
+    sources_cfg = config["sources"]
 
     sr = model_cfg["sample_rate"]
     block_size = model_cfg["block_size"]
@@ -57,7 +57,7 @@ def generate_collection(
         n_latents=n_latents,
         resolved_routing=resolved,
         unassigned_policy=collection["unassigned"],
-        algorithms_cfg=algorithms_cfg,
+        sources_cfg=sources_cfg,
         global_seed=global_seed,
         sr_latent=sr_latent,
         sweep_cache=sweep_cache,
@@ -94,10 +94,15 @@ def generate_collection(
     sf.write(str(wav_path), audio, sr, subtype="FLOAT")
     logger.info(f"  → {wav_path}")
 
-    # Sidecar JSON
-    used_algos = {
-        algo_name: algorithms_cfg[algo_name] for _, (algo_name, _) in collection["routing"].items()
+    # Collect source definitions actually used in this collection
+    used_src_names: set[str] = set()
+    for contribs in collection["routing"].values():
+        for c in contribs:
+            used_src_names.add(c["src"])
+    sources_used = {
+        name: sources_cfg[name] for name in sorted(used_src_names) if name in sources_cfg
     }
+
     sidecar = {
         "collection_name": collection_name,
         "description": collection.get("description", ""),
@@ -106,11 +111,12 @@ def generate_collection(
         "model": model_cfg,
         "global_config": global_cfg,
         "collection": collection,
-        "algorithms_used": used_algos,
+        "sources_used": sources_used,
         "active_dims": active_dims,
         "observed_ranges": sweep_cache.get("observed_ranges", {}),
         "rms_variance": sweep_cache.get("rms_variance", {}),
-        "routing_resolved": {str(dim): [algo, gain] for dim, (algo, gain) in resolved.items()},
+        "timbral_variance": sweep_cache.get("timbral_variance", {}),
+        "routing_resolved": {str(dim): contributions for dim, contributions in resolved.items()},
         "warnings": warnings,
     }
 
